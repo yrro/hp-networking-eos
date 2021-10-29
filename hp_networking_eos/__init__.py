@@ -9,10 +9,20 @@ def main(argv):
 
     ensure_eos_xml()
 
-    tree = ET.parse('eos.xml')
-    print(tree.getroot())
+    for item in extract_items():
+        print(item)
 
     return 0
+
+
+def extract_items():
+
+    tree = ET.parse('eos.xml')
+    for item in tree.getroot().findall('Item'):
+        i = {}
+        for subitem in item:
+            i[subitem.tag] = subitem.text
+        yield i
 
 
 def ensure_eos_xml():
