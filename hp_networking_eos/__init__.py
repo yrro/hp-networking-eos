@@ -1,16 +1,22 @@
+import logging
 import json
 from pathlib import Path
-import xml.etree.ElementTree as ET
 from urllib.request import Request, urlopen
 import urllib.error
+import xml.etree.ElementTree as ET
+
+
+LOGGER = logging.getLogger(__name__)
 
 
 def main(argv):
 
+    logging.basicConfig(level=logging.DEBUG)
+
     ensure_eos_xml()
 
     for item in extract_items():
-        print(item)
+        LOGGER.info('item: %r', item)
 
     return 0
 
@@ -18,11 +24,44 @@ def main(argv):
 def extract_items():
 
     tree = ET.parse('eos.xml')
-    for item in tree.getroot().findall('Item'):
-        i = {}
-        for subitem in item:
-            i[subitem.tag] = subitem.text
-        yield i
+
+    headings = {}
+    product = None
+    for i, item in enumerate(tree.getroot().findall('Item')):
+
+        # Special handling for first Item, it gives us the descriptions of
+        # subsequent headings
+        if i == 0:
+
+            for subitem in item:
+                headings[subitem.tag] = subitem.text.split('\n')[0]
+            LOGGER.debug('headings: %r', headings)
+
+        else:
+            id_ = item.find('ID')
+            if not (id_ is None):
+
+                LOGGER.debug('begin product %r', id_.text)
+
+                if not (product is None):
+                    LOGGER.debug('finalize product: %r', product)
+                    yield product
+
+                product = {}
+                for subitem in item:
+                    product[subitem.tag] = subitem.text
+                product['table'] = []
+
+            else:
+
+                row = {}
+                for subitem in item:
+                    row[subitem.tag] = subitem.text
+                LOGGER.debug('row: %r', row)
+                product['table'].append(row)
+
+    LOGGER.debug('final product: %r', product)
+    yield product
 
 
 def ensure_eos_xml():
